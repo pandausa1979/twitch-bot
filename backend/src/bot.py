@@ -1,69 +1,88 @@
 import os
-from datetime import datetime
+import logging
 from dotenv import load_dotenv
 from twitchio.ext import commands
 from pymongo import MongoClient
-from auth import TwitchAuth
+from datetime import datetime, UTC
+from urllib.parse import quote_plus
+
+# Set up logging
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('logs/bot.log'),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger(__name__)
 
 # Load environment variables
 load_dotenv()
 
-# MongoDB setup
-client = MongoClient(os.getenv('MONGODB_URI'))
-db = client[os.getenv('DB_NAME', 'twitch_chat_db')]
-collection = db[os.getenv('COLLECTION_NAME', 'messages')]
-
 class Bot(commands.Bot):
     def __init__(self):
-        # Initialize auth
-        auth = TwitchAuth()
-        token = auth.get_token()
-
-        # Initialize bot with OAuth token
-        super().__init__(
-            token=token,
-            client_id=os.getenv('CLIENT_ID'),
-            nick=os.getenv('BOT_NICK'),
-            prefix='!',
-            initial_channels=[os.getenv('CHANNEL')]
-        )
+        # Initialize MongoDB connection
+        password = quote_plus('/8vqZjEBJv9v8DZvpuHASAdyOllng7gV39rE0eKkuvc=')  # Root password from MongoDB pod
+        mongo_uri = f"mongodb://TwitchBot:{password}@localhost:32458/admin"
+        self.mongo_client = MongoClient(mongo_uri)
+        self.db = self.mongo_client['twitch']  # Use twitch database after authenticating with admin
+        self.messages = self.db['messages']
         
-        self.auth = auth
+        # Initialize the bot with token and prefix
+        channel = os.getenv('TWITCH_CHANNEL')
+        if channel.startswith('#'):
+            channel = channel[1:]  # Remove the # if present
+        super().__init__(
+            token=os.getenv('TWITCH_TMI_TOKEN'),
+            prefix='!',
+            initial_channels=[channel]
+        )
+        logger.info("Bot initialized with MongoDB connection")
 
     async def event_ready(self):
-        print(f'Logged in as | {self.nick}')
-        print(f'Connected to channel | {os.getenv("CHANNEL")}')
+        logger.info(f'Bot is ready! Username: {self.nick}')
+        channel = self.get_channel(os.getenv('TWITCH_CHANNEL').lstrip('#'))
+        if channel:
+            await channel.send("Bot is now online!")
+            logger.info(f'Connected to channel: {channel.name}')
+        else:
+            logger.error(f'Could not find channel: {os.getenv("TWITCH_CHANNEL")}')
 
     async def event_message(self, message):
         # Ignore messages from the bot itself
         if message.echo:
             return
 
-        # Create message document
-        chat_message = {
+        logger.debug(f"Received message: {message.content} from {message.author.name}")
+        
+        # Log the message to MongoDB
+        self.messages.insert_one({
             'channel': message.channel.name,
-            'author': message.author.name,
-            'content': message.content,
-            'timestamp': datetime.utcnow(),
-            'badges': [badge for badge in message.author.badges] if message.author.badges else [],
-            'is_subscriber': message.author.is_subscriber,
-            'is_mod': message.author.is_mod
-        }
+            'user': message.author.name,
+            'message': message.content,
+            'timestamp': datetime.now(UTC)
+        })
 
-        # Store message in MongoDB
-        try:
-            collection.insert_one(chat_message)
-            print(f'Stored message from {message.author.name}')
-        except Exception as e:
-            print(f'Error storing message: {e}')
-
-        # Handle commands
+        # Process commands
         await self.handle_commands(message)
 
     @commands.command(name='hello')
     async def hello_command(self, ctx):
+        logger.debug(f"Hello command triggered by {ctx.author.name}")
         await ctx.send(f'Hello {ctx.author.name}!')
 
+    @commands.command(name='ping')
+    async def ping_command(self, ctx):
+        logger.debug(f"Ping command triggered by {ctx.author.name}")
+        await ctx.send('Pong!')
+
 if __name__ == '__main__':
+    # Create logs directory if it doesn't exist
+    if not os.path.exists('logs'):
+        os.makedirs('logs')
+        logger.info("Created logs directory")
+
+    # Start the bot
     bot = Bot()
     bot.run() 

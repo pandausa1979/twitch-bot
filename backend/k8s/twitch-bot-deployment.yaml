@@ -1,0 +1,52 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: twitch-bot
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: twitch-bot
+  template:
+    metadata:
+      labels:
+        app: twitch-bot
+    spec:
+      containers:
+      - name: twitch-bot
+        image: twitch-bot:latest
+        imagePullPolicy: Never  # Use local image
+        env:
+        - name: TWITCH_CHANNEL
+          value: "#your_channel"  # Default channel, can be overridden
+        - name: TWITCH_BOT_NICKNAME
+          valueFrom:
+            secretKeyRef:
+              name: twitch-bot-secret
+              key: bot-nickname
+        - name: TWITCH_TMI_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: twitch-bot-secret
+              key: tmi-token
+        - name: MONGODB_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: mongodb-secret
+              key: username
+        - name: MONGODB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: mongodb-secret
+              key: password
+        - name: MONGODB_HOST
+          value: "mongodb"
+        - name: MONGODB_PORT
+          value: "27017"
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "100m"
+          limits:
+            memory: "128Mi"
+            cpu: "200m" 
