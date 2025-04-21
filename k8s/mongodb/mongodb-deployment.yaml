@@ -19,9 +19,9 @@ spec:
         - containerPort: 27017
         env:
         - name: MONGO_INITDB_ROOT_USERNAME
-          value: "twitchbot"
+          value: "TwitchBot"
         - name: MONGO_INITDB_ROOT_PASSWORD
-          value: "Guyver@01071987"
+          value: "/8vqZjEBJv9v8DZvpuHASAdyOllng7gV39rE0eKkuvc="
         volumeMounts:
         - name: mongodb-data
           mountPath: /data/db

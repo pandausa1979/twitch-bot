@@ -1,52 +1,88 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: twitch-bot
+  name: twitch-bot-${CHANNEL}  # Will be replaced with actual channel name
+  labels:
+    app: twitch-bot
+    channel: ${CHANNEL}
 spec:
   replicas: 1
   selector:
     matchLabels:
       app: twitch-bot
+      channel: ${CHANNEL}
   template:
     metadata:
       labels:
         app: twitch-bot
+        channel: ${CHANNEL}
     spec:
       containers:
       - name: twitch-bot
-        image: twitch-bot:latest
-        imagePullPolicy: Never  # Use local image
+        image: twitch-bot:latest  # Using local image
+        imagePullPolicy: Never
+        args: ["--channel", "${CHANNEL}"]
         env:
-        - name: TWITCH_CHANNEL
-          value: "#your_channel"  # Default channel, can be overridden
-        - name: TWITCH_BOT_NICKNAME
-          valueFrom:
-            secretKeyRef:
-              name: twitch-bot-secret
-              key: bot-nickname
         - name: TWITCH_TMI_TOKEN
           valueFrom:
             secretKeyRef:
-              name: twitch-bot-secret
+              name: twitch-credentials
               key: tmi-token
-        - name: MONGODB_USERNAME
-          valueFrom:
-            secretKeyRef:
-              name: mongodb-secret
-              key: username
+        - name: MONGODB_USER
+          value: "TwitchBot"
         - name: MONGODB_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: mongodb-secret
+              name: mongodb-credentials
               key: password
         - name: MONGODB_HOST
-          value: "mongodb"
+          value: "mongodb.default.svc.cluster.local"
         - name: MONGODB_PORT
           value: "27017"
+        ports:
+        - containerPort: 8080
+          name: health
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: health
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: health
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
         resources:
           requests:
-            memory: "64Mi"
+            memory: "128Mi"
             cpu: "100m"
           limits:
-            memory: "128Mi"
-            cpu: "200m" 
+            memory: "256Mi"
+            cpu: "200m"
+        volumeMounts:
+        - name: logs
+          mountPath: /app/logs
+      volumes:
+      - name: logs
+        emptyDir: {}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: twitch-bot-config
+data:
+  channel: "pandabotconnect"  # Default channel, can be overridden per deployment
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: twitch-credentials
+type: Opaque
+data:
+  tmi-token: "b2F1dGg6MzR0MHhmdm1qMWM2bW1md3ozbmxicDhxaTVlaTRl"  # Base64 encoded token 

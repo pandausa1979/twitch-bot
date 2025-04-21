@@ -1,4 +1,4 @@
-FROM python:3.12-slim
+FROM python:3.11-slim
 
 WORKDIR /app
 
@@ -14,13 +14,13 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy the rest of the application
 COPY src/ ./src/
 
-# Set environment variables
-ENV PYTHONPATH=/app
-ENV TWITCH_SERVER=irc.chat.twitch.tv
-ENV TWITCH_PORT=6667
-ENV MONGODB_HOST=mongodb
-ENV MONGODB_PORT=27017
-ENV MONGODB_DATABASE=twitch
+# Create logs directory
+RUN mkdir -p logs
 
-# The channel name will be passed as an environment variable when running the container
-CMD ["python", "-m", "src.bot"] 
+# Set environment variables
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONPATH=/app
+
+# Command to run the bot with channel parameter
+ENTRYPOINT ["python", "-u", "src/bot.py"]
+CMD ["--channel", "default"] 
