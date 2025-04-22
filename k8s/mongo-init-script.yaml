@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mongo-init
+data:
+  init.js: |
+    db = db.getSiblingDB('admin');
+    db.createUser({
+      user: 'admin',
+      pwd: 'adminPassword',
+      roles: ['root']
+    });
+    db = db.getSiblingDB('twitch_bot');
+    db.createUser({
+      user: 'TwitchBot',
+      pwd: 'TwitchBotPassword',
+      roles: [
+        { role: 'readWrite', db: 'twitch_bot' }
+      ]
+    }); 

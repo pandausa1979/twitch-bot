@@ -27,18 +27,27 @@ load_dotenv()
 class Bot(commands.Bot):
     def __init__(self, channel):
         # Initialize MongoDB connection
-        mongo_user = os.getenv('MONGODB_USER', 'TwitchBot')
-        mongo_password = os.getenv('MONGODB_PASSWORD')
-        mongo_host = os.getenv('MONGODB_HOST', 'localhost')
-        mongo_port = os.getenv('MONGODB_PORT', '27017')
-        
-        if not mongo_password:
-            logger.error("MONGODB_PASSWORD environment variable not set")
-            raise ValueError("MongoDB password not configured")
+        try:
+            mongo_user = os.getenv('MONGODB_USER', 'TwitchBot')
+            mongo_password = os.getenv('MONGODB_PASSWORD', 'TwitchBotSecurePass123')
+            mongo_host = os.getenv('MONGODB_HOST', 'localhost')
+            mongo_port = os.getenv('MONGODB_PORT', '30017')  # Updated to use NodePort
             
-        mongo_uri = f"mongodb://{mongo_user}:{quote_plus(mongo_password)}@{mongo_host}:{mongo_port}/admin"
-        self.mongo_client = MongoClient(mongo_uri)
-        self.db = self.mongo_client['twitch']
+            if not mongo_password:
+                logger.error("MONGODB_PASSWORD environment variable not set")
+                raise ValueError("MongoDB password not configured")
+                
+            mongo_uri = f"mongodb://{mongo_user}:{quote_plus(mongo_password)}@{mongo_host}:{mongo_port}/admin?retryWrites=true&w=majority"
+            self.mongo_client = MongoClient(mongo_uri)
+            
+            # Test the connection
+            self.mongo_client.admin.command('ping')
+            logger.info("Successfully connected to MongoDB")
+            
+            self.db = self.mongo_client['twitch']
+        except Exception as e:
+            logger.error(f"Failed to connect to MongoDB: {str(e)}")
+            raise
         
         # Initialize the bot with token and prefix
         if channel.startswith('#'):

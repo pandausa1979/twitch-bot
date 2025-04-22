@@ -1,0 +1,53 @@
+# Create ConfigMap for the new channel
+kubectl create configmap twitch-bot-newchannel-config --from-literal=channel=newchannel
+
+# Create deployment for the new channel
+kubectl create -f - <<EOF
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: twitch-bot-newchannel
+  labels:
+    app: twitch-bot
+    channel: newchannel
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: twitch-bot
+      channel: newchannel
+  template:
+    metadata:
+      labels:
+        app: twitch-bot
+        channel: newchannel
+    spec:
+      containers:
+      - name: twitch-bot
+        image: twitch-bot:latest
+        imagePullPolicy: IfNotPresent
+        args: ["--channel", "$(CHANNEL_NAME)"]
+        env:
+        - name: CHANNEL_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: twitch-bot-newchannel-config
+              key: channel
+        - name: TWITCH_TMI_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: twitch-credentials
+              key: tmi-token
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+        volumeMounts:
+        - name: logs
+          mountPath: /app/logs
+      volumes:
+      - name: logs
+        emptyDir: {}
