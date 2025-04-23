@@ -25,6 +25,7 @@ lib64/
 parts/
 sdist/
 var/
+wheels/
 *.egg-info/
 .installed.cfg
 *.egg
@@ -69,3 +70,32 @@ mongodb.yaml
 *.log
 mongodb-compass_1.42.3_amd64.deb
 mongodb-connection.txt
+
+# Virtual Environment
+venv/
+ENV/
+.env
+
+# Logs
+logs/
+*.log
+
+# Kubernetes secrets
+*-secret.yaml
+*-credentials.yaml
+twitch-credentials.json
+
+# Local development
+.DS_Store
+*.local
+
+# MongoDB
+mongodb-data/
+
+# Docker
+.docker/
+*.tar
+
+# Environment variables
+.env*
+!.env.example

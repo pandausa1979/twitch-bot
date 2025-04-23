@@ -1,0 +1,116 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    deployment.kubernetes.io/revision: "5"
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"apps/v1","kind":"Deployment","metadata":{"annotations":{},"labels":{"app":"twitch-bot","channel":"ragster1979"},"name":"twitch-bot-ragster1979","namespace":"default"},"spec":{"replicas":1,"selector":{"matchLabels":{"app":"twitch-bot","channel":"ragster1979"}},"template":{"metadata":{"labels":{"app":"twitch-bot","channel":"ragster1979"}},"spec":{"containers":[{"env":[{"name":"TWITCH_TOKEN","valueFrom":{"secretKeyRef":{"key":"token","name":"twitch-bot-secret"}}},{"name":"MONGODB_USER","value":"TwitchBot"},{"name":"MONGODB_PASSWORD","valueFrom":{"secretKeyRef":{"key":"password","name":"mongodb-credentials"}}},{"name":"MONGODB_URI","value":"mongodb://localhost:30017/twitch_bot"}],"image":"twitch-bot:latest","imagePullPolicy":"Never","name":"twitch-bot","resources":{"limits":{"cpu":"200m","memory":"128Mi"},"requests":{"cpu":"100m","memory":"64Mi"}}}]}}}}
+  creationTimestamp: "2025-04-21T23:26:25Z"
+  generation: 5
+  labels:
+    app: twitch-bot
+    channel: ragster1979
+  name: twitch-bot-ragster1979
+  namespace: default
+  resourceVersion: "123390"
+  uid: 0a166ea3-cf27-4c65-933b-965e99c1bee3
+spec:
+  progressDeadlineSeconds: 600
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app: twitch-bot
+      channel: ragster1979
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: twitch-bot
+        channel: ragster1979
+    spec:
+      containers:
+      - name: twitch-bot
+        image: twitch-bot:latest
+        imagePullPolicy: Never
+        args: ["--channel", "ragster1979"]
+        env:
+        - name: TWITCH_TMI_TOKEN
+          valueFrom:
+            secretKeyRef:
+              key: token
+              name: twitch-bot-secret
+        - name: MONGODB_USER
+          value: TwitchBot
+        - name: MONGODB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: password
+              name: mongodb-credentials
+        - name: MONGODB_HOST
+          value: mongodb
+        - name: MONGODB_PORT
+          value: "27017"
+        - name: CHANNEL_NAME
+          value: "ragster1979"
+        ports:
+        - containerPort: 8080
+          name: health
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: health
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: health
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+        volumeMounts:
+        - name: logs
+          mountPath: /app/logs
+      volumes:
+      - name: logs
+        emptyDir: {}
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+status:
+  availableReplicas: 1
+  conditions:
+  - lastTransitionTime: "2025-04-22T02:06:17Z"
+    lastUpdateTime: "2025-04-22T02:06:17Z"
+    message: Deployment has minimum availability.
+    reason: MinimumReplicasAvailable
+    status: "True"
+    type: Available
+  - lastTransitionTime: "2025-04-21T23:26:25Z"
+    lastUpdateTime: "2025-04-22T02:08:01Z"
+    message: ReplicaSet "twitch-bot-7cb6445cbd" has successfully progressed.
+    reason: NewReplicaSetAvailable
+    status: "True"
+    type: Progressing
+  observedGeneration: 5
+  readyReplicas: 1
+  replicas: 1
+  updatedReplicas: 1

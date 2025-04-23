@@ -1,87 +1,122 @@
-# Twitch Chat Bot and Dashboard
+# Twitch Bot
 
-A full-stack application for monitoring and analyzing Twitch chat messages, built with Python, Next.js, and MongoDB.
-
-## Project Structure
-
-```
-twitch-bot/
-├── backend/           # Python backend service
-│   ├── src/          # Backend source code
-│   │   ├── bot.py    # Twitch chat bot implementation
-│   │   ├── auth.py   # Authentication utilities
-│   │   └── __main__.py
-│   └── requirements.txt
-├── frontend/         # Next.js frontend application
-│   ├── src/          # Frontend source code
-│   ├── public/       # Static assets
-│   └── certificates/ # SSL certificates
-└── k8s/              # Kubernetes deployment configurations
-    └── mongodb/      # MongoDB deployment files
-```
+A Kubernetes-based Twitch chat bot that can be deployed for multiple channels.
 
 ## Features
 
-- Real-time Twitch chat monitoring
-- Message storage and analysis
-- Modern web dashboard
-- Kubernetes deployment support
+- Multi-channel support with separate deployments per channel
+- MongoDB integration for data persistence
+- Health monitoring endpoints
+- Kubernetes-native deployment
+- Configurable through environment variables
+
+## Prerequisites
+
+- Python 3.11+
+- MongoDB
+- Kubernetes cluster (tested with MicroK8s)
+- Twitch Developer Account
 
 ## Setup
 
-### Backend
+1. Clone the repository:
+```bash
+git clone https://github.com/yourusername/twitch-bot.git
+cd twitch-bot
+```
 
-1. Create a Python virtual environment:
-   ```bash
-   cd backend
-   python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-   ```
+2. Create necessary Kubernetes secrets:
+```bash
+# Create MongoDB credentials
+kubectl create secret generic mongodb-credentials \
+  --from-literal=username=your_mongodb_user \
+  --from-literal=password=your_mongodb_password \
+  --from-literal=app_password=your_app_password
 
-2. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
+# Create Twitch credentials
+kubectl create secret generic twitch-bot-secret \
+  --from-literal=token=oauth:your_twitch_token \
+  --from-literal=client_id=your_client_id
+```
 
-3. Create a `.env` file with your Twitch credentials:
-   ```
-   TWITCH_BOT_USERNAME=your_bot_username
-   TWITCH_OAUTH_TOKEN=oauth:your_oauth_token
-   TWITCH_CHANNEL=channel_to_join
-   ```
+3. Deploy MongoDB:
+```bash
+kubectl apply -f k8s/mongodb-pvc.yaml
+kubectl apply -f k8s/mongodb-deployment.yaml
+kubectl apply -f k8s/mongodb-service.yaml
+```
 
-### Frontend
+4. Deploy the bot:
+```bash
+# Deploy for a specific channel
+kubectl apply -f k8s/twitch-bot-deployment.yaml
+```
 
-1. Install dependencies:
-   ```bash
-   cd frontend
-   npm install
-   ```
+## Configuration
 
-2. Generate SSL certificates (for local development):
-   ```bash
-   ./mkcert-v1.4.4-linux-amd64 localhost
-   mv localhost.pem localhost-key.pem certificates/
-   ```
+Copy `.env.example` to `.env` and update the values:
 
-3. Start the development server:
-   ```bash
-   npm run dev
-   ```
-
-### MongoDB
-
-The application uses MongoDB for data storage. You can either:
-- Use a local MongoDB instance
-- Use the provided Kubernetes configuration in the `k8s/mongodb` directory
+```bash
+cp .env.example .env
+# Edit .env with your configuration
+```
 
 ## Development
 
-- Backend: Python 3.8+
-- Frontend: Next.js with TypeScript
-- Database: MongoDB
-- Deployment: Kubernetes
+1. Create a virtual environment:
+```bash
+python -m venv venv
+source venv/bin/activate  # Linux/Mac
+# or
+.\venv\Scripts\activate  # Windows
+```
+
+2. Install dependencies:
+```bash
+pip install -r requirements.txt
+```
+
+3. Run locally:
+```bash
+python src/bot.py --channel your_channel_name
+```
+
+## Kubernetes Deployment
+
+The application is designed to run in Kubernetes with the following components:
+
+- MongoDB StatefulSet for data persistence
+- Separate deployments for each Twitch channel
+- Health checks for monitoring
+- ConfigMaps for channel-specific configuration
+- Secrets for sensitive data
+
+## Directory Structure
+
+```
+.
+├── backend/
+│   ├── src/
+│   │   ├── bot.py
+│   │   ├── config.py
+│   │   └── health.py
+│   └── requirements.txt
+├── k8s/
+│   ├── mongodb-deployment.yaml
+│   ├── mongodb-service.yaml
+│   ├── mongodb-pvc.yaml
+│   └── twitch-bot-deployment.yaml
+└── README.md
+```
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Commit your changes
+4. Push to the branch
+5. Create a Pull Request
 
 ## License
 
-MIT 
+MIT License - see LICENSE file for details 

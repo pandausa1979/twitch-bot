@@ -4,20 +4,31 @@ metadata:
   name: mongo-init
 data:
   init.js: |
-    db = db.getSiblingDB('admin')
+    // First create the root user
+    db.auth(process.env.MONGO_INITDB_ROOT_USERNAME, process.env.MONGO_INITDB_ROOT_PASSWORD)
+    
+    // Create a dedicated database for the Twitch bot
+    db = db.getSiblingDB('twitchbot')
+    
+    // Create application user with specific permissions
     db.createUser({
-      user: process.env.MONGO_INITDB_ROOT_USERNAME,
-      pwd: process.env.MONGO_INITDB_ROOT_PASSWORD,
+      user: "TwitchBot",
+      pwd: process.env.MONGO_APP_PASSWORD,
       roles: [
-        { role: "root", db: "admin" }
+        {
+          role: "readWrite",
+          db: "twitchbot"
+        }
       ]
     })
-    db.auth(process.env.MONGO_INITDB_ROOT_USERNAME, process.env.MONGO_INITDB_ROOT_PASSWORD)
-    db = db.getSiblingDB('twitch')
-    db.createUser({
-      user: process.env.MONGO_INITDB_ROOT_USERNAME,
-      pwd: process.env.MONGO_INITDB_ROOT_PASSWORD,
-      roles: [
-        { role: "readWrite", db: "twitch" }
-      ]
-    }) 
+    
+    // Create initial collections with proper indexes
+    db.createCollection("messages")
+    db.createCollection("commands")
+    db.createCollection("users")
+    
+    // Create indexes for better performance
+    db.messages.createIndex({ "timestamp": 1 })
+    db.messages.createIndex({ "channel": 1 })
+    db.commands.createIndex({ "name": 1 }, { unique: true })
+    db.users.createIndex({ "username": 1 }, { unique: true }) 
