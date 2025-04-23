@@ -2,6 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: twitch-bot
+  namespace: default
   labels:
     app: twitch-bot
 spec:
@@ -16,27 +17,36 @@ spec:
     spec:
       containers:
       - name: twitch-bot
-        image: twitch-bot:latest
-        imagePullPolicy: Never
+        image: localhost:32000/twitch-bot:latest
+        imagePullPolicy: Always
         env:
         - name: TWITCH_TOKEN
           valueFrom:
             secretKeyRef:
               name: twitch-bot-secret
               key: token
+        - name: TWITCH_CLIENT_ID
+          valueFrom:
+            secretKeyRef:
+              name: twitch-bot-secret
+              key: client_id
+        - name: TWITCH_CHANNELS
+          valueFrom:
+            configMapKeyRef:
+              name: twitch-bot-config
+              key: channels
+        - name: MONGODB_HOST
+          value: "mongodb"
+        - name: MONGODB_PORT
+          value: "27017"
         - name: MONGODB_USER
           value: "TwitchBot"
         - name: MONGODB_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: mongodb-credentials
-              key: password
-        - name: MONGODB_URI
-          value: "mongodb://localhost:30017/twitch_bot"
+          value: "TwitchBotSecurePass123"
         resources:
           requests:
+            cpu: "10m"
             memory: "64Mi"
-            cpu: "100m"
           limits:
-            memory: "128Mi"
-            cpu: "200m" 
+            cpu: "50m"
+            memory: "128Mi" 

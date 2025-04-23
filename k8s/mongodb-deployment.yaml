@@ -15,8 +15,7 @@ spec:
     spec:
       containers:
       - name: mongodb
-        image: mongo:latest
-        args: ["--auth"]
+        image: mongo:6.0
         ports:
         - containerPort: 27017
         env:
@@ -30,11 +29,6 @@ spec:
             secretKeyRef:
               name: mongodb-credentials
               key: password
-        - name: MONGO_APP_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: mongodb-credentials
-              key: app_password
         volumeMounts:
         - name: mongodb-data
           mountPath: /data/db

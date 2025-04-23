@@ -1,87 +1,109 @@
 """Main bot module that integrates all components."""
 import logging
 import os
-from typing import Optional, List
+from typing import List, Optional
+from datetime import datetime, UTC
 from twitchio.ext import commands
+import asyncio
 
-from ..config import AppConfig, load_config
+from ..config import AppConfig, load_config, MongoConfig
 from ..database.client import DatabaseClient
+from ..database.models import Channel
 from .events import EventHandler
-from .commands import hello_command, ping_command
+from .commands import CommandHandler
 
 logger = logging.getLogger(__name__)
 
 class TwitchBot(commands.Bot):
-    """Main Twitch bot class that integrates all components."""
+    """Main Twitch bot class."""
     
-    def __init__(self, channel: str):
+    def __init__(self, channels: List[str]):
         """
         Initialize the Twitch bot.
         
         Args:
-            channel: The Twitch channel to join
+            channels: List of channel names to join
         """
-        # Load configuration
-        self.config = load_config()
+        # Get configuration from environment
+        token = os.getenv('TWITCH_TOKEN')
+        client_id = os.getenv('TWITCH_CLIENT_ID')
         
-        # Initialize database client
-        self.db_client = DatabaseClient(self.config.mongo)
+        if not token or not client_id:
+            raise ValueError("Missing required environment variables: TWITCH_TOKEN, TWITCH_CLIENT_ID")
         
-        # Initialize the bot with token and prefix
-        if channel.startswith('#'):
-            channel = channel[1:]  # Remove the # if present
-            
+        # Initialize the bot
         super().__init__(
-            token=self.config.bot.tmi_token,
-            prefix=self.config.bot.prefix,
-            initial_channels=[channel]
+            token=token,
+            client_id=client_id,
+            nick="TwitchBot",
+            prefix="!",
+            initial_channels=channels
         )
         
-        # Initialize event handler
+        # Initialize database client
+        mongo_config = MongoConfig(
+            host=os.getenv('MONGO_HOST', 'localhost'),
+            port=int(os.getenv('MONGO_PORT', '27017')),
+            username=os.getenv('MONGO_USER', 'twitch_bot_app'),
+            password=os.getenv('MONGO_PASSWORD', '')
+        )
+        self.db_client = DatabaseClient(mongo_config)
+        
+        # Initialize handlers
         self.event_handler = EventHandler(self, self.db_client)
+        self.command_handler = CommandHandler(self, self.db_client)
         
-        # Register commands
-        self.add_command(hello_command)
-        self.add_command(ping_command)
+        # Register event handlers
+        self.register_events()
+    
+    async def setup_channels(self):
+        """Set up channels in the database."""
+        for channel_name in self.initial_channels:
+            # Create channel object
+            channel = Channel(
+                name=channel_name.lower(),
+                display_name=channel_name,
+                is_active=True,
+                joined_at=datetime.now(UTC),
+                last_active=datetime.now(UTC)
+            )
+            
+            # Add to database if not exists
+            await self.db_client.add_channel(channel)
+    
+    def register_events(self):
+        """Register event handlers."""
+        self.event_ready = self.event_handler.on_ready
+        self.event_message = self.event_handler.on_message
+        self.event_error = self.event_handler.on_error
+        self.event_command_error = self.event_handler.on_error
+    
+    async def event_command(self, ctx: commands.Context):
+        """
+        Handle command events.
         
-        logger.info(f"Bot initialized for channel: {channel}")
+        Args:
+            ctx: The command context
+        """
+        await self.command_handler.handle_command(ctx)
     
-    async def event_ready(self):
-        """Handle the ready event."""
-        await self.event_handler.on_ready()
-    
-    async def event_message(self, message):
-        """Handle incoming messages."""
-        await self.event_handler.on_message(message)
-        # Process commands after handling the message
-        await self.handle_commands(message)
-    
-    async def event_error(self, error: Exception):
-        """Handle errors."""
-        await self.event_handler.on_error(error)
-    
-    async def event_disconnect(self):
-        """Handle disconnection."""
-        await self.event_handler.on_disconnect()
+    async def close(self):
+        """Clean up resources when shutting down."""
+        self.db_client.close()
+        await super().close()
     
     def run(self):
         """Run the bot with proper setup and cleanup."""
         try:
-            # Ensure logs directory exists
-            os.makedirs(self.config.log.log_dir, exist_ok=True)
-            
             # Configure logging
             logging.basicConfig(
-                level=getattr(logging, self.config.log.level),
-                format=self.config.log.format,
-                handlers=[
-                    logging.FileHandler(self.config.log.log_path),
-                    logging.StreamHandler()
-                ]
+                level=logging.INFO,
+                format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
             )
             
-            # Connect to database
+            # Connect to database and set up channels
             self.db_client.connect()
+            asyncio.run(self.setup_channels())
             
             # Start the bot
             super().run()

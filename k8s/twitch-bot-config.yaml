@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: twitch-bot-config
+  namespace: default
+data:
+  channels: "ragster1979,pandabotconnect"  # Comma-separated list of channels to monitor 

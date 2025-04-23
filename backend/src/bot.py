@@ -25,40 +25,46 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 
 class Bot(commands.Bot):
-    def __init__(self, channel):
+    def __init__(self):
         # Initialize MongoDB connection
         try:
             mongo_user = os.getenv('MONGODB_USER', 'TwitchBot')
             mongo_password = os.getenv('MONGODB_PASSWORD', 'TwitchBotSecurePass123')
             mongo_host = os.getenv('MONGODB_HOST', 'localhost')
-            mongo_port = os.getenv('MONGODB_PORT', '30017')  # Updated to use NodePort
+            mongo_port = os.getenv('MONGODB_PORT', '27017')
             
             if not mongo_password:
                 logger.error("MONGODB_PASSWORD environment variable not set")
                 raise ValueError("MongoDB password not configured")
                 
-            mongo_uri = f"mongodb://{mongo_user}:{quote_plus(mongo_password)}@{mongo_host}:{mongo_port}/admin?retryWrites=true&w=majority"
+            mongo_uri = f"mongodb://{mongo_user}:{quote_plus(mongo_password)}@{mongo_host}:{mongo_port}/twitch_bot?authSource=admin&retryWrites=true&w=majority"
             self.mongo_client = MongoClient(mongo_uri)
             
             # Test the connection
             self.mongo_client.admin.command('ping')
             logger.info("Successfully connected to MongoDB")
             
-            self.db = self.mongo_client['twitch']
+            self.db = self.mongo_client['twitch_bot']
         except Exception as e:
             logger.error(f"Failed to connect to MongoDB: {str(e)}")
             raise
+
+        # Get channels from environment variable
+        channels_str = os.getenv('TWITCH_CHANNELS', '')
+        if not channels_str:
+            logger.error("TWITCH_CHANNELS environment variable not set")
+            raise ValueError("No channels configured")
+            
+        # Split channels string into list and remove any whitespace
+        channels = [ch.strip() for ch in channels_str.split(',')]
+        logger.info(f"Connecting to channels: {channels}")
         
         # Initialize the bot with token and prefix
-        if channel.startswith('#'):
-            channel = channel[1:]  # Remove the # if present
-        self.channel = channel
         super().__init__(
-            token=os.getenv('TWITCH_TMI_TOKEN'),
+            token=os.getenv('TWITCH_TOKEN'),
             prefix='!',
-            initial_channels=[channel]
+            initial_channels=channels
         )
-        logger.info(f"Bot initialized for channel: {channel}")
 
     def get_channel_collection(self, channel_name):
         """Get or create a collection for a specific channel"""
@@ -77,35 +83,26 @@ class Bot(commands.Bot):
         while retry_count < max_retries:
             try:
                 logger.info(f'Bot is ready! Username: {self.nick}')
-                channel = self.get_channel(self.channel)
-                if channel:
-                    await channel.send("Bot is now online!")
-                    logger.info(f'Connected to channel: {channel.name}')
+                logger.info(f'Connected to channels: {", ".join(self._connection.joining_channels)}')
 
-                    # Start health server after bot is ready
-                    app = web.Application()
-                    setup_health_routes(app, self.mongo_client)
-                    runner = web.AppRunner(app)
-                    await runner.setup()
-                    site = web.TCPSite(runner, '0.0.0.0', 8080)
-                    await site.start()
-                    logger.info("Health check server started on port 8080")
-                    return
-                else:
-                    logger.error(f'Could not find channel: {self.channel}')
-                    retry_count += 1
-                    if retry_count < max_retries:
-                        logger.info(f'Retrying connection in 5 seconds... (Attempt {retry_count + 1}/{max_retries})')
-                        await asyncio.sleep(5)
+                # Start health server after bot is ready
+                app = web.Application()
+                setup_health_routes(app, self.mongo_client)
+                runner = web.AppRunner(app)
+                await runner.setup()
+                site = web.TCPSite(runner, '0.0.0.0', 8080)
+                await site.start()
+                logger.info("Health check server started on port 8080")
+                return
             except Exception as e:
                 logger.error(f'Error in event_ready: {str(e)}')
                 retry_count += 1
                 if retry_count < max_retries:
-                    logger.info(f'Retrying connection in 5 seconds... (Attempt {retry_count + 1}/{max_retries})')
+                    logger.info(f'Retrying in 5 seconds... (Attempt {retry_count + 1}/{max_retries})')
                     await asyncio.sleep(5)
         
-        logger.error(f'Failed to connect to channel after {max_retries} attempts')
-        raise ConnectionError(f'Could not connect to channel {self.channel}')
+        logger.error(f'Failed to initialize after {max_retries} attempts')
+        raise ConnectionError('Failed to initialize bot')
 
     async def event_error(self, error):
         logger.error(f'Bot encountered an error: {str(error)}')
@@ -145,18 +142,13 @@ class Bot(commands.Bot):
         await ctx.send('Pong!')
 
 def main():
-    # Parse command line arguments
-    parser = argparse.ArgumentParser(description='Twitch Bot')
-    parser.add_argument('--channel', required=True, help='Twitch channel to monitor')
-    args = parser.parse_args()
-
     # Create logs directory if it doesn't exist
     if not os.path.exists('logs'):
         os.makedirs('logs')
         logger.info("Created logs directory")
 
     # Start the bot
-    bot = Bot(args.channel)
+    bot = Bot()
     bot.run()
 
 if __name__ == '__main__':

@@ -31,4 +31,38 @@ data:
     db.messages.createIndex({ "timestamp": 1 })
     db.messages.createIndex({ "channel": 1 })
     db.commands.createIndex({ "name": 1 }, { unique: true })
-    db.users.createIndex({ "username": 1 }, { unique: true }) 
+    db.users.createIndex({ "username": 1 }, { unique: true })
+
+    // Create the twitch bot application user with necessary permissions
+    db.createUser({
+      user: "twitch_bot_app",
+      pwd: passwordPrompt(),  // This will be replaced with the value from MONGO_APP_PASSWORD
+      roles: [
+        {
+          role: "dbOwner",
+          db: "admin"  // Allows creation and management of new databases
+        }
+      ]
+    });
+
+    // Create a custom role for managing channel-specific databases
+    db.createRole({
+      role: "channelDbManager",
+      privileges: [
+        {
+          resource: { db: "", collection: "" },  // Applies to all databases
+          actions: [
+            "createCollection",
+            "createIndex",
+            "find",
+            "insert",
+            "update",
+            "remove"
+          ]
+        }
+      ],
+      roles: []
+    });
+
+    // Grant the custom role to the application user
+    db.grantRolesToUser("twitch_bot_app", ["channelDbManager"]); 
